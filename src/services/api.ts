@@ -12,7 +12,7 @@ const api = axios.create({
     // To use `my-json-server`, make sure your `db.json` is located at the repo root.
 
     /* baseURL: 'https://my-json-server.typicode.com/l-lavapie071/assignment-task2', */
-    baseURL: 'http://172.16.29.193:3333',
+    baseURL: 'http://172.16.35.3:3333',
 });
 
 export const authenticateUser = (email: string, password: string): Promise<AxiosResponse> => {

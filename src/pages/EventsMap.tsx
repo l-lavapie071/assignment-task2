@@ -1,41 +1,30 @@
+import React, { useContext, useEffect, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  Platform,
+  StatusBar,
+} from "react-native";
+import { RectButton } from "react-native-gesture-handler";
 import { Feather } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StackScreenProps } from "@react-navigation/stack";
-import React, { useContext, useEffect, useRef, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
-import { RectButton } from "react-native-gesture-handler";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import customMapStyle from "../../map-style.json";
-import * as MapSettings from "../constants/MapSettings";
+import eventsRaw from "../../db.json";
 import { AuthenticationContext } from "../context/AuthenticationContext";
-import mapMarkerImg from "../images/map-marker.png";
-import eventsData from "../../db.json";
+import { Event } from "../types/Event";
 
-interface Event {
-  id: string;
-  name: string;
-  description: string;
-  position: { latitude: number; longitude: number };
-  dateTime: string;
-}
-
-export default function EventsMap(props: StackScreenProps<any>) {
-  const { navigation } = props;
-  const authenticationContext = useContext(AuthenticationContext);
-  const mapViewRef = useRef<MapView>(null);
-
+export default function EventsMap({ navigation }: any) {
+  const auth = useContext(AuthenticationContext);
+  const currentUser = auth?.value;
   const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
-    // Show all events for debugging
-    console.log("Event data:", eventsData.events);
-
-    // Filter upcoming events only
+    const eventsData = eventsRaw as { events: Event[] };
     const upcomingEvents = eventsData.events.filter(
       (event) => new Date(event.dateTime) > new Date()
     );
-
-    // If no upcoming events, show all events to avoid empty map
     setEvents(upcomingEvents.length ? upcomingEvents : eventsData.events);
   }, []);
 
@@ -49,47 +38,48 @@ export default function EventsMap(props: StackScreenProps<any>) {
 
   const handleLogout = async () => {
     await AsyncStorage.multiRemove(["userInfo", "accessToken"]);
-    authenticationContext?.setValue(undefined);
+    auth?.setValue(undefined);
     navigation.navigate("Login");
   };
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapViewRef}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={MapSettings.DEFAULT_REGION}
-        style={styles.mapStyle}
-        customMapStyle={customMapStyle}
-        showsMyLocationButton={false}
-        showsUserLocation={true}
-        rotateEnabled={false}
-        toolbarEnabled={false}
-        moveOnMarkerPress={false}
-        mapPadding={MapSettings.EDGE_PADDING}
-        onLayout={() => {
-          if (events.length) {
-            mapViewRef.current?.fitToCoordinates(
-              events.map((e) => e.position),
-              { edgePadding: MapSettings.EDGE_PADDING }
-            );
-          }
+      {/* --- WELCOME --- */}
+      {currentUser && (
+        <Text
+          style={[
+            styles.welcome,
+            {
+              paddingTop:
+                Platform.OS === "android" ? StatusBar.currentHeight || 20 : 40,
+            },
+          ]}
+        >
+          Welcome, {currentUser.name.first} {currentUser.name.last}!
+        </Text>
+      )}
+
+      {/* --- EVENTS LIST --- */}
+      <FlatList
+        data={events}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: 100,
         }}
-      >
-        {events.map((event) => (
-          <Marker
-            key={event.id}
-            coordinate={event.position}
-            onPress={() => handleNavigateToEventDetails(event.id)}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.eventCard}
+            onPress={() => handleNavigateToEventDetails(item.id)}
           >
-            <Image
-              resizeMode="contain"
-              style={{ width: 48, height: 54 }}
-              source={mapMarkerImg}
-            />
-          </Marker>
-        ))}
-      </MapView>
+            <Text style={styles.eventTitle}>{item.name}</Text>
+            <Text style={styles.eventDate}>
+              {new Date(item.dateTime).toLocaleString()}
+            </Text>
+            <Text style={styles.eventDescription}>{item.description}</Text>
+          </TouchableOpacity>
+        )}
+      />
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>{events.length} event(s) found</Text>
@@ -116,14 +106,19 @@ export default function EventsMap(props: StackScreenProps<any>) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFillObject,
-    flex: 1,
-    justifyContent: "flex-end",
-    alignItems: "center",
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
+  welcome: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginLeft: 20,
+    marginBottom: 10,
   },
-  mapStyle: { ...StyleSheet.absoluteFillObject },
-  logoutButton: { position: "absolute", top: 70, right: 24, elevation: 3 },
+  logoutButton: {
+    position: "absolute",
+    top: Platform.OS === "android" ? StatusBar.currentHeight! + 20 : 70,
+    right: 24,
+    elevation: 3,
+  },
   footer: {
     position: "absolute",
     left: 24,
@@ -146,4 +141,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  eventCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    elevation: 2,
+  },
+  eventTitle: { fontSize: 16, fontWeight: "bold", marginBottom: 4 },
+  eventDate: { fontSize: 12, color: "#666", marginBottom: 6 },
+  eventDescription: { fontSize: 14, color: "#444" },
 });

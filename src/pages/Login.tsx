@@ -2,7 +2,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { StackScreenProps } from "@react-navigation/stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import { Alert, Image, StyleSheet, Text, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Spinner from "react-native-loading-spinner-overlay";
@@ -22,10 +22,11 @@ export default function Login({ navigation }: StackScreenProps<any>) {
   const [emailIsInvalid, setEmailIsInvalid] = useState<boolean>();
   const [passwordIsInvalid, setPasswordIsInvalid] = useState<boolean>();
   const [authError, setAuthError] = useState<string>();
-
   const [accessTokenIsValid, setAccessTokenIsValid] = useState<boolean>(false);
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const isFocused = useIsFocused();
+
+  const passwordInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     getFromCache("userInfo").then(
@@ -52,12 +53,6 @@ export default function Login({ navigation }: StackScreenProps<any>) {
   }, [accessTokenIsValid]);
 
   const handleAuthentication = () => {
-    /* Alert.alert(
-      "Account Info",
-      `Email: ${email}\nPassword: ${password}`,
-      [{ text: "OK" }],
-      { cancelable: true }
-    ); */
     if (formIsValid()) {
       setIsAuthenticating(true);
       api
@@ -67,7 +62,6 @@ export default function Login({ navigation }: StackScreenProps<any>) {
           setInCache("accessToken", response.data.accessToken);
           authenticationContext?.setValue(response.data.user);
           setIsAuthenticating(false);
-          123;
           navigation.navigate("EventsMap");
         })
         .catch((error) => {
@@ -90,13 +84,13 @@ export default function Login({ navigation }: StackScreenProps<any>) {
   const isPasswordInvalid = (): boolean => {
     const invalidCheck = password.length < 6;
     setPasswordIsInvalid(invalidCheck);
-    return invalidCheck ? true : false;
+    return invalidCheck;
   };
 
   const isEmailInvalid = (): boolean => {
     const invalidCheck = !validateEmail(email);
     setEmailIsInvalid(invalidCheck);
-    return invalidCheck ? true : false;
+    return invalidCheck;
   };
 
   return (
@@ -126,6 +120,8 @@ export default function Login({ navigation }: StackScreenProps<any>) {
           source={logoImg}
         />
         <Spacer size={80} />
+
+        {/* Email input */}
         <View style={styles.inputLabelRow}>
           <Text style={styles.label}>Email</Text>
           {emailIsInvalid && <Text style={styles.error}>invalid email</Text>}
@@ -134,8 +130,12 @@ export default function Login({ navigation }: StackScreenProps<any>) {
           style={[styles.input, emailIsInvalid && styles.invalid]}
           onChangeText={(value) => setEmail(value)}
           onEndEditing={isEmailInvalid}
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => passwordInputRef.current?.focus()}
         />
 
+        {/* Password input */}
         <View style={styles.inputLabelRow}>
           <Text style={styles.label}>Password</Text>
           {passwordIsInvalid && (
@@ -143,11 +143,15 @@ export default function Login({ navigation }: StackScreenProps<any>) {
           )}
         </View>
         <TextInput
+          ref={passwordInputRef}
           style={[styles.input, passwordIsInvalid && styles.invalid]}
           secureTextEntry={true}
           onChangeText={(value) => setPassword(value)}
           onEndEditing={isPasswordInvalid}
+          returnKeyType="done"
+          onSubmitEditing={handleAuthentication}
         />
+
         <Spacer size={80} />
         <BigButton
           style={{ marginBottom: 8 }}
@@ -155,6 +159,7 @@ export default function Login({ navigation }: StackScreenProps<any>) {
           label="Log in"
           color="#FF8700"
         />
+
         <Spinner
           visible={isAuthenticating}
           textContent={"Authenticating..."}
@@ -170,30 +175,25 @@ const styles = StyleSheet.create({
   gradientContainer: {
     flex: 1,
   },
-
   container: {
     flex: 1,
   },
-
   spinnerText: {
     fontSize: 16,
     fontFamily: "Nunito_700Bold",
     color: "#fff",
   },
-
   label: {
     color: "#fff",
     fontFamily: "Nunito_600SemiBold",
     fontSize: 15,
   },
-
   inputLabelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
     marginBottom: 4,
   },
-
   input: {
     backgroundColor: "#fff",
     borderWidth: 1.4,
@@ -208,11 +208,9 @@ const styles = StyleSheet.create({
     fontFamily: "Nunito_600SemiBold",
     fontSize: 15,
   },
-
   invalid: {
     borderColor: "red",
   },
-
   error: {
     color: "white",
     fontFamily: "Nunito_600SemiBold",
